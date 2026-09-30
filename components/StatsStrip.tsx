@@ -7,25 +7,25 @@ interface StatsStripProps {
 
 export function StatsStrip({ items }: StatsStripProps) {
   const watchedMovies = items.filter(
-    (i) => i.type === "movie" && i.status === "watched"
+    (i) => i.type === "movie" && i.status === "watched",
   ).length;
 
   const watchedSeries = items.filter(
-    (i) => i.type === "series" && i.status === "watched"
+    (i) => i.type === "series" && i.status === "watched",
   ).length;
 
   const gamesCompleted = items.filter(
-    (i) => i.type === "game" && i.status === "completed"
+    (i) => i.type === "game" && i.status === "completed",
   ).length;
 
   const gamesPlayed = items.filter(
-    (i) => i.type === "game" && i.status === "played"
+    (i) => i.type === "game" && i.status === "played",
   ).length;
 
   const wishlistCount = items.filter((i) => i.status === "wishlist").length;
 
   const ratedItems = items.filter(
-    (i) => i.rating !== null && i.rating !== undefined
+    (i) => i.rating !== null && i.rating !== undefined,
   );
 
   const avgRating =
@@ -63,22 +63,14 @@ export function StatsStrip({ items }: StatsStripProps) {
       {/* Stat item: Games Completed */}
       <div className="flex flex-col items-center sm:items-start min-w-[70px]">
         <span className="text-[10px] font-pixel text-[#A6FF00] uppercase tracking-wider">
-          COMPLETED
+          GAMES
         </span>
         <span className="arcade-score text-sm sm:text-base mt-1 text-[#A6FF00]">
-          {padZero(gamesCompleted)}
+          {padZero(gamesCompleted + gamesPlayed)}
         </span>
       </div>
 
-      {/* Stat item: Games Played */}
-      <div className="flex flex-col items-center sm:items-start min-w-[70px]">
-        <span className="text-[10px] font-pixel text-[#FFB000] uppercase tracking-wider">
-          PLAYED
-        </span>
-        <span className="arcade-score text-sm sm:text-base mt-1 text-[#FFB000]">
-          {padZero(gamesPlayed)}
-        </span>
-      </div>
+      
 
       {/* Stat item: Wishlist */}
       <div className="flex flex-col items-center sm:items-start min-w-[70px]">

@@ -27,8 +27,8 @@ export function Header({ onOpenAdd }: HeaderProps) {
             className="pixel-btn-hero flex items-center gap-2 cursor-pointer"
             aria-label="Add new movie, series or game"
           >
-            <PixelPlusIcon size={16} />
-            <span>+ ADD</span>
+         
+            <span> ADD</span>
           </button>
         </div>
       </div>

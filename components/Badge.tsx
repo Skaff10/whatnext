@@ -18,7 +18,7 @@ export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
             isSm ? "text-[9px] px-1.5 py-0.5" : "text-[11px] px-2.5 py-1"
           }`}
         >
-          <PixelCheckIcon size={isSm ? 10 : 12} />
+          
           WATCHED
         </span>
       );
@@ -26,10 +26,10 @@ export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
       return (
         <span
           className={`inline-flex items-center gap-1 font-pixel uppercase font-bold tracking-wider border-2 border-black bg-[#A6FF00] text-[#0A0812] pixel-shadow-sm ${
-            isSm ? "text-[9px] px-1.5 py-0.5" : "text-[11px] px-2.5 py-1"
+            isSm ? "text-[9px] px-1 py-0.5" : "text-[11px] px-2.5 py-1"
           }`}
         >
-          <PixelCheckIcon size={isSm ? 10 : 12} />
+         
           COMPLETED
         </span>
       );
@@ -50,7 +50,7 @@ export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
             isSm ? "text-[9px] px-1.5 py-0.5" : "text-[11px] px-2.5 py-1"
           }`}
         >
-          <PixelStarIcon size={isSm ? 10 : 12} />
+         
           WISHLIST
         </span>
       );
@@ -94,7 +94,7 @@ export function RatingBadge({ rating, size = "md" }: RatingBadgeProps) {
       style={{ boxShadow: `3px 3px 0 #000, 0 0 6px ${glowColor}` }}
       title={`Rating: ${formatted} / 10.0`}
     >
-      ★ {formatted}
+      {formatted}
     </div>
   );
 }

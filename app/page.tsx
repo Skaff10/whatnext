@@ -1,69 +1,354 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { Item, ItemType, ItemStatus } from "@/lib/types";
+import { Header } from "@/components/Header";
+import { StatsStrip } from "@/components/StatsStrip";
+import {
+  FilterBar,
+  TypeFilterOption,
+  StatusFilterOption,
+  SortOption,
+} from "@/components/FilterBar";
+import { Card } from "@/components/Card";
+import { AddModal } from "@/components/AddModal";
+import { DetailModal } from "@/components/DetailModal";
+import { LevelUpOverlay } from "@/components/LevelUpOverlay";
+import { EmptyState } from "@/components/EmptyState";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { ToastContainer, ToastMessage } from "@/components/Toast";
+import { Footer } from "@/components/Footer";
 
 export default function Home() {
+  const [items, setItems] = useState<Item[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Filters & Sorting
+  const [typeFilter, setTypeFilter] = useState<TypeFilterOption>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilterOption>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOption, setSortOption] = useState<SortOption>("recent");
+
+  // Modals & Overlays
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+
+  // Toast system
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const addToast = useCallback(
+    (text: string, type: "error" | "success" | "info" = "info") => {
+      const id = `${Date.now()}-${Math.random()}`;
+      setToasts((prev) => [...prev, { id, text, type }]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 4500);
+    },
+    []
+  );
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Initial fetch from /api/items
+  useEffect(() => {
+    async function fetchItems() {
+      try {
+        const res = await fetch("/api/items");
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load library items.");
+        }
+        setItems(data.items || []);
+      } catch (err: any) {
+        console.error(err);
+        addToast(
+          err.message || "Failed to load data. Please ensure Firebase is configured.",
+          "error"
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchItems();
+  }, [addToast]);
+
+  // Set of existing IDs for duplicate prevention in search
+  const existingIds = useMemo(
+    () => new Set(items.map((i) => i.id)),
+    [items]
+  );
+
+  // Wishlist items for filter bar badge
+  const wishlistItems = useMemo(
+    () => items.filter((i) => i.status === "wishlist"),
+    [items]
+  );
+
+  // Filtering and Sorting
+  const filteredAndSortedItems = useMemo(() => {
+    let result = [...items];
+
+    // Filter by type
+    if (typeFilter !== "all") {
+      result = result.filter((i) => i.type === typeFilter);
+    }
+
+    // Filter by status
+    if (statusFilter !== "all") {
+      result = result.filter((i) => i.status === statusFilter);
+    }
+
+    // Filter by title search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((i) => i.title.toLowerCase().includes(q));
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      switch (sortOption) {
+        case "recent":
+          return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
+        case "rating_desc": {
+          const aR = a.rating ?? -1;
+          const bR = b.rating ?? -1;
+          return bR - aR;
+        }
+        case "rating_asc": {
+          const aR = a.rating ?? 999;
+          const bR = b.rating ?? 999;
+          return aR - bR;
+        }
+        case "title_asc":
+          return a.title.localeCompare(b.title);
+        case "year_desc": {
+          const aY = a.year ?? 0;
+          const bY = b.year ?? 0;
+          return bY - aY;
+        }
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [items, typeFilter, statusFilter, searchQuery, sortOption]);
+
+  // CREATE ITEM (Optimistic with Rollback)
+  const handleAddItem = async (itemData: {
+    type: ItemType;
+    externalId: number;
+    title: string;
+    year: number | null;
+    posterUrl: string | null;
+    overview: string;
+    genres: string[];
+    status: ItemStatus;
+    rating: number | null;
+  }) => {
+    const docId = `${itemData.type}-${itemData.externalId}`;
+    const previousItems = [...items];
+    const now = new Date().toISOString();
+
+    const optimisticItem: Item = {
+      ...itemData,
+      id: docId,
+      addedAt: now,
+      updatedAt: now,
+    };
+
+    // Optimistically update UI
+    setItems((prev) => [optimisticItem, ...prev]);
+
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(itemData),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to add item");
+      }
+
+      // Replace with server item if present
+      if (resData.item) {
+        setItems((prev) =>
+          prev.map((i) => (i.id === docId ? resData.item : i))
+        );
+      }
+      addToast(`"${itemData.title}" ADDED TO SHELF!`, "success");
+    } catch (err: any) {
+      console.error(err);
+      // Rollback
+      setItems(previousItems);
+      addToast(err.message || "Failed to save item.", "error");
+      throw err;
+    }
+  };
+
+  // UPDATE ITEM (Optimistic with Rollback)
+  const handleUpdateItem = async (
+    id: string,
+    updates: { status?: ItemStatus; rating?: number | null }
+  ) => {
+    const previousItems = [...items];
+    const now = new Date().toISOString();
+
+    // Optimistically update
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, ...updates, updatedAt: now } : i
+      )
+    );
+
+    // Also update selectedItem if currently opened in modal
+    if (selectedItem && selectedItem.id === id) {
+      setSelectedItem((prev) =>
+        prev ? { ...prev, ...updates, updatedAt: now } : null
+      );
+    }
+
+    try {
+      const res = await fetch(`/api/items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to update item");
+      }
+
+      if (resData.item) {
+        setItems((prev) =>
+          prev.map((i) => (i.id === id ? resData.item : i))
+        );
+        if (selectedItem && selectedItem.id === id) {
+          setSelectedItem(resData.item);
+        }
+      }
+      addToast("STATUS & SCORE UPDATED.", "success");
+    } catch (err: any) {
+      console.error(err);
+      // Rollback
+      setItems(previousItems);
+      if (selectedItem && selectedItem.id === id) {
+        const original = previousItems.find((i) => i.id === id);
+        if (original) setSelectedItem(original);
+      }
+      addToast(err.message || "Failed to update item.", "error");
+      throw err;
+    }
+  };
+
+  // DELETE ITEM (Optimistic with Rollback)
+  const handleDeleteItem = async (id: string) => {
+    const previousItems = [...items];
+    const itemToDelete = items.find((i) => i.id === id);
+
+    // Optimistically remove
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    setSelectedItem(null);
+
+    try {
+      const res = await fetch(`/api/items/${id}`, {
+        method: "DELETE",
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to delete item");
+      }
+      addToast(
+        `"${itemToDelete?.title || "Item"}" EJECTED FROM SYSTEM.`,
+        "info"
+      );
+    } catch (err: any) {
+      console.error(err);
+      // Rollback
+      setItems(previousItems);
+      addToast(err.message || "Failed to delete item.", "error");
+      throw err;
+    }
+  };
+
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex flex-col min-h-screen">
+      {/* Top Header */}
+      <Header onOpenAdd={() => setIsAddOpen(true)} />
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Arcade Stats Strip */}
+        <StatsStrip items={items} />
+
+        {/* Filter & Controls Bar */}
+        <FilterBar
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          sortOption={sortOption}
+          onSortOptionChange={setSortOption}
+          wishlistCount={wishlistItems.length}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        {/* Content Body */}
+        {isLoading ? (
+          <LoadingScreen />
+        ) : items.length === 0 ? (
+          <EmptyState onAddClick={() => setIsAddOpen(true)} />
+        ) : filteredAndSortedItems.length === 0 ? (
+          <EmptyState onAddClick={() => setIsAddOpen(true)} isFiltered />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+            {filteredAndSortedItems.map((item) => (
+              <Card
+                key={item.id}
+                item={item}
+                onClick={() => setSelectedItem(item)}
+              />
+            ))}
+          </div>
+        )}
       </main>
+
+      {/* Modals & Overlays */}
+      <AddModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onAdd={handleAddItem}
+        existingIds={existingIds}
+      />
+
+      <DetailModal
+        item={selectedItem}
+        isOpen={selectedItem !== null}
+        onClose={() => setSelectedItem(null)}
+        onUpdate={handleUpdateItem}
+        onDelete={handleDeleteItem}
+        onTriggerLevelUp={() => setShowLevelUp(true)}
+      />
+
+      <LevelUpOverlay
+        show={showLevelUp}
+        onDone={() => setShowLevelUp(false)}
+      />
+
+      {/* Retro Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }

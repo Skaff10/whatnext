@@ -1,26 +1,360 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-night: #14101F;
+  --surface: #1F1A33;
+  --surface-alt: #292244;
+  --surface-hover: #352B58;
+  --cream: #F4E9D0;
+  --hot-magenta: #FF3D81;
+  --cyan: #2DE2E6;
+  --amber: #FFB000;
+  --lime: #A6FF00;
+  --border-dark: #0A0812;
+  --border-mid: #3B335E;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --font-pixel: var(--font-pixel), "Courier New", monospace;
+  --font-vt323: var(--font-vt323), "Courier New", monospace;
+  --color-bg-night: #14101F;
+  --color-surface: #1F1A33;
+  --color-surface-alt: #292244;
+  --color-surface-hover: #352B58;
+  --color-cream: #F4E9D0;
+  --color-hot-magenta: #FF3D81;
+  --color-cyan: #2DE2E6;
+  --color-amber: #FFB000;
+  --color-lime: #A6FF00;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* HARD NO-ROUNDING RULE */
+*, *::before, *::after {
+  border-radius: 0 !important;
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-night);
+  color: var(--cream);
+  font-family: var(--font-vt323), monospace;
+  font-size: 1.25rem;
+  line-height: 1.4;
+  letter-spacing: 0.03em;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Accessible keyboard focus */
+*:focus-visible {
+  outline: 3px solid var(--cyan) !important;
+  outline-offset: 2px !important;
+}
+
+/* Font helper classes */
+.font-pixel {
+  font-family: var(--font-pixel), monospace;
+}
+
+.font-vt323 {
+  font-family: var(--font-vt323), monospace;
+}
+
+/* CRT SCANLINE OVERLAY */
+.crt-scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.18) 0px,
+    rgba(0, 0, 0, 0.18) 2px,
+    rgba(255, 255, 255, 0.02) 2px,
+    rgba(255, 255, 255, 0.02) 4px
+  );
+  opacity: 0.85;
+}
+
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* CRT VIGNETTE */
+.crt-vignette {
+  background: radial-gradient(
+    circle at center,
+    transparent 60%,
+    rgba(10, 8, 18, 0.5) 85%,
+    rgba(8, 6, 14, 0.85) 100%
+  );
+}
+
+/* RETRO SHADOWS & BUTTONS */
+.pixel-shadow {
+  box-shadow: 4px 4px 0 #000;
+}
+
+.pixel-shadow-sm {
+  box-shadow: 2px 2px 0 #000;
+}
+
+.pixel-shadow-magenta {
+  box-shadow: 4px 4px 0 var(--hot-magenta);
+}
+
+.pixel-shadow-cyan {
+  box-shadow: 4px 4px 0 var(--cyan);
+}
+
+.pixel-shadow-amber {
+  box-shadow: 4px 4px 0 var(--amber);
+}
+
+.pixel-shadow-lime {
+  box-shadow: 4px 4px 0 var(--lime);
+}
+
+/* INTERACTIVE PIXEL BUTTONS */
+.pixel-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  font-family: var(--font-pixel), monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 0.6rem 1rem;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0 #000;
+  transition: transform 0.05s steps(2, start), box-shadow 0.05s steps(2, start);
+  cursor: pointer;
+  user-select: none;
+}
+
+.pixel-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
+}
+
+.pixel-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 #000;
+}
+
+/* HERO ADD BUTTON */
+.pixel-btn-hero {
+  border: 4px solid #000;
+  background-color: var(--hot-magenta);
+  color: #fff;
+  font-family: var(--font-pixel), monospace;
+  font-size: 0.875rem;
+  letter-spacing: 0.06em;
+  padding: 0.75rem 1.4rem;
+  box-shadow: 5px 5px 0 var(--cyan), 7px 7px 0 #000;
+  transition: transform 0.05s steps(2, start), box-shadow 0.05s steps(2, start);
+}
+
+.pixel-btn-hero:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 3px 3px 0 var(--cyan), 5px 5px 0 #000;
+  background-color: #ff5290;
+}
+
+.pixel-btn-hero:active {
+  transform: translate(5px, 5px);
+  box-shadow: 0 0 0 #000;
+}
+
+/* LOGO MULTI-LAYER RETRO SHADOW */
+.logo-retro-shadow {
+  text-shadow: 
+    3px 3px 0 var(--hot-magenta),
+    -3px -3px 0 rgba(45, 226, 230, 0.8),
+    5px 5px 0 #000;
+}
+
+/* BLINKING RETRO CURSOR */
+@keyframes blink-cursor {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+.blinking-cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.9em;
+  background-color: var(--cyan);
+  vertical-align: middle;
+  margin-left: 4px;
+  animation: blink-cursor 0.9s steps(2, start) infinite;
+}
+
+/* COIN INSERT ANIMATION */
+@keyframes coin-pop {
+  0% {
+    transform: scale(0.85) translateY(10px);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05) translateY(-4px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-coin-pop {
+  animation: coin-pop 0.3s steps(4, end) forwards;
+}
+
+/* LEVEL UP FLASH */
+@keyframes levelup-flash {
+  0% {
+    background-color: var(--lime);
+    color: #000;
+  }
+  25% {
+    background-color: var(--cyan);
+    color: #000;
+  }
+  50% {
+    background-color: var(--hot-magenta);
+    color: #fff;
+  }
+  75% {
+    background-color: var(--amber);
+    color: #000;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-levelup {
+  animation: levelup-flash 0.8s steps(4, start) 1;
+}
+
+/* RETRO VHS STRIP & CARTRIDGE NOTCH */
+.vhs-tape-box {
+  background-color: var(--surface);
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0 #000;
+  position: relative;
+  transition: transform 0.1s steps(2, start), box-shadow 0.1s steps(2, start);
+}
+
+.vhs-tape-box:hover {
+  transform: translateY(-4px);
+  box-shadow: 4px 8px 0 #000, 0 0 10px rgba(45, 226, 230, 0.2);
+}
+
+.game-cartridge-box {
+  background-color: #242038;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0 #000;
+  position: relative;
+  clip-path: polygon(
+    8px 0%,
+    calc(100% - 8px) 0%,
+    100% 8px,
+    100% 100%,
+    0% 100%,
+    0% 8px
+  );
+  transition: transform 0.1s steps(2, start), box-shadow 0.1s steps(2, start);
+}
+
+.game-cartridge-box:hover {
+  transform: translateY(-4px);
+  box-shadow: 4px 8px 0 #000, 0 0 10px rgba(166, 255, 0, 0.2);
+}
+
+/* RETRO ARCADE SCORE DISPLAY */
+.arcade-score {
+  font-family: var(--font-pixel), monospace;
+  background-color: #000;
+  border: 2px solid var(--border-mid);
+  color: var(--amber);
+  text-shadow: 0 0 5px rgba(255, 176, 0, 0.7);
+  letter-spacing: 0.1em;
+  padding: 4px 8px;
+}
+
+/* CUSTOM RETRO RANGE SLIDER (VOLUME / HEALTH BAR) */
+input[type="range"].retro-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px;
+  background: repeating-linear-gradient(
+    90deg,
+    #0A0812 0px,
+    #0A0812 12px,
+    #292244 12px,
+    #292244 14px
+  );
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+  cursor: pointer;
+  margin: 8px 0;
+}
+
+input[type="range"].retro-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 28px;
+  background: var(--hot-magenta);
+  border: 2px solid #000;
+  box-shadow: 2px 2px 0 var(--cyan);
+  cursor: pointer;
+}
+
+input[type="range"].retro-range::-moz-range-thumb {
+  width: 18px;
+  height: 28px;
+  background: var(--hot-magenta);
+  border: 2px solid #000;
+  box-shadow: 2px 2px 0 var(--cyan);
+  cursor: pointer;
+}
+
+/* SHUFFLE ANIMATION FOR SLOT MACHINE "PICK SOMETHING FOR ME" */
+@keyframes slot-shuffle {
+  0% { transform: translateY(0); filter: blur(0); }
+  25% { transform: translateY(-15px); filter: blur(1px); }
+  50% { transform: translateY(15px); filter: blur(1px); }
+  75% { transform: translateY(-8px); filter: blur(0.5px); }
+  100% { transform: translateY(0); filter: blur(0); }
+}
+
+.animate-slot-shuffle {
+  animation: slot-shuffle 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+/* REDUCED MOTION PREFERENCES */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .crt-scanlines {
+    display: none;
+  }
+  .blinking-cursor {
+    animation: none;
+    opacity: 1;
+  }
 }

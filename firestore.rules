@@ -1,0 +1,13 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // DENY ALL DIRECT CLIENT READS AND WRITES.
+    // The "What Next?" app accesses Firestore exclusively through server-side 
+    // Next.js Route Handlers using the Firebase Admin SDK.
+    // The Firebase Admin SDK bypasses client security rules automatically.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

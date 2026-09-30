@@ -17,9 +17,9 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
-  title: "What Next? — Retro Media & Game Tracker",
+  title: "Blacklist - Media & Game Tracker",
   description:
-    "A 90s video rental store & arcade tracker for movies, series and games. What should you watch or play next?",
+    "A 90s video rental store & arcade tracker for movies, series and games.",
 };
 
 export default function RootLayout({

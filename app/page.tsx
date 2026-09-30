@@ -24,7 +24,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Filters & Sorting
-  const [typeFilter, setTypeFilter] = useState<TypeFilterOption>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilterOption>("game");
   const [statusFilter, setStatusFilter] = useState<StatusFilterOption>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("recent");
@@ -92,9 +92,7 @@ export default function Home() {
     let result = [...items];
 
     // Filter by type
-    if (typeFilter !== "all") {
-      result = result.filter((i) => i.type === typeFilter);
-    }
+    result = result.filter((i) => i.type === typeFilter);
 
     // Filter by status
     if (statusFilter !== "all") {

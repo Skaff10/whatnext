@@ -13,7 +13,7 @@ export function Header({ onOpenAdd }: HeaderProps) {
         <div className="flex items-center gap-2">
           <span className="w-4 h-4 bg-[#FF3D81] border-2 border-black inline-block animate-pulse" />
           <h1 className="font-pixel text-xl sm:text-2xl md:text-3xl text-[#F4E9D0] logo-retro-shadow tracking-wider uppercase select-none">
-            WHAT NEXT?
+           BLACKLIST
             <span className="blinking-cursor" />
           </h1>
         </div>

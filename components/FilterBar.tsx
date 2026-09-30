@@ -8,7 +8,7 @@ import {
   PixelSearchIcon,
 } from "./PixelIcons";
 
-export type TypeFilterOption = "all" | ItemType;
+export type TypeFilterOption = ItemType;
 export type StatusFilterOption = "all" | ItemStatus;
 export type SortOption =
   | "recent"
@@ -57,7 +57,7 @@ export function FilterBar({
         { label: "WISHLIST", value: "wishlist" },
       ];
     }
-    // Union for "all"
+    // Union fallback
     return [
       { label: "ALL STATUS", value: "all" },
       { label: "WATCHED", value: "watched" },
@@ -77,10 +77,9 @@ export function FilterBar({
         <div className="flex flex-wrap items-center gap-1 sm:gap-2">
           {(
             [
-              { id: "all", label: "ALL", icon: null },
+              { id: "game", label: "GAMES", icon: <GamepadIcon size={12} /> },
               { id: "movie", label: "MOVIES", icon: <FilmIcon size={12} /> },
               { id: "series", label: "SERIES", icon: <TvIcon size={12} /> },
-              { id: "game", label: "GAMES", icon: <GamepadIcon size={12} /> },
             ] as const
           ).map((tab) => {
             const isActive = typeFilter === tab.id;
@@ -95,6 +94,9 @@ export function FilterBar({
                     (tab.id === "movie" || tab.id === "series") &&
                     (statusFilter === "completed" || statusFilter === "played")
                   ) {
+                    onStatusFilterChange("all");
+                  }
+                  if (tab.id === "game" && statusFilter === "watched") {
                     onStatusFilterChange("all");
                   }
                 }}

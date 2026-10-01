@@ -28,10 +28,12 @@ interface AddModalProps {
     posterUrl: string | null;
     overview: string;
     genres: string[];
-    status: ItemStatus;
+    status: ItemStatus | null;
+    isWishlist: boolean;
     rating: number | null;
   }) => Promise<void>;
   existingIds: Set<string>;
+  defaultSection?: "game" | "movie" | "series" | "wishlist";
 }
 
 export function AddModal({
@@ -39,8 +41,10 @@ export function AddModal({
   onClose,
   onAdd,
   existingIds,
+  defaultSection = "movie",
 }: AddModalProps) {
   const [selectedType, setSelectedType] = useState<ItemType>("movie");
+  const [destination, setDestination] = useState<"shelf" | "wishlist">("shelf");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -48,7 +52,7 @@ export function AddModal({
 
   // Selected result step
   const [selectedItem, setSelectedItem] = useState<SearchResultItem | null>(null);
-  const [status, setStatus] = useState<ItemStatus>("wishlist");
+  const [status, setStatus] = useState<ItemStatus>("watched");
   const [rating, setRating] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -57,21 +61,27 @@ export function AddModal({
   // Reset modal state on open/close
   useEffect(() => {
     if (isOpen) {
-      setSelectedType("movie");
+      if (defaultSection === "wishlist") {
+        setSelectedType("movie");
+        setDestination("wishlist");
+      } else {
+        setSelectedType(defaultSection);
+        setDestination("shelf");
+      }
       setSearchQuery("");
       setSearchResults([]);
       setSelectedItem(null);
-      setStatus("wishlist");
+      setStatus(defaultSection === "game" ? "completed" : "watched");
       setRating(null);
       setSearchError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, defaultSection]);
 
   // When type changes, clear selected and search
   const handleTypeChange = (type: ItemType) => {
     setSelectedType(type);
     setSelectedItem(null);
-    setStatus("wishlist");
+    setStatus(type === "game" ? "completed" : "watched");
     setRating(null);
     if (searchQuery.trim().length > 1) {
       triggerSearch(searchQuery.trim(), type);
@@ -118,17 +128,8 @@ export function AddModal({
 
   const handleSelectItem = (item: SearchResultItem) => {
     setSelectedItem(item);
-    // Default status to wishlist
-    setStatus("wishlist");
+    setStatus(selectedType === "game" ? "completed" : "watched");
     setRating(null);
-  };
-
-  const handleStatusChange = (newStatus: ItemStatus) => {
-    setStatus(newStatus);
-    // If switched to wishlist, clear rating
-    if (newStatus === "wishlist") {
-      setRating(null);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -137,6 +138,7 @@ export function AddModal({
 
     setIsSaving(true);
     try {
+      const isWishlist = destination === "wishlist";
       await onAdd({
         type: selectedType,
         externalId: selectedItem.externalId,
@@ -145,8 +147,9 @@ export function AddModal({
         posterUrl: selectedItem.posterUrl,
         overview: selectedItem.overview,
         genres: selectedItem.genres,
-        status,
-        rating: isRatingAllowed(status) ? rating : null,
+        status: isWishlist ? null : status,
+        isWishlist,
+        rating: !isWishlist && isRatingAllowed(status) ? rating : null,
       });
       onClose();
     } catch (err) {
@@ -372,39 +375,83 @@ export function AddModal({
                 </button>
               </div>
 
-              {/* Status Picker */}
+              {/* Step: Choose Destination (Shelf vs Wishlist) */}
               <div>
                 <label className="block font-pixel text-xs text-[#2DE2E6] uppercase tracking-wider mb-2">
-                  CHOOSE STATUS
+                  CHOOSE DESTINATION
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {ALLOWED_STATUSES_BY_TYPE[selectedType].map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => handleStatusChange(st)}
-                      className={`pixel-btn text-xs py-1.5 px-3 uppercase ${
-                        status === st
-                          ? st === "watched"
-                            ? "bg-[#2DE2E6] text-black font-bold"
-                            : st === "completed"
-                            ? "bg-[#A6FF00] text-black font-bold"
-                            : st === "played"
-                            ? "bg-[#FFB000] text-black font-bold"
-                            : "bg-[#FF3D81] text-white font-bold"
-                          : "bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDestination("shelf")}
+                    className={`pixel-btn text-xs py-2 px-3 flex items-center justify-center gap-2 ${
+                      destination === "shelf"
+                        ? "bg-[#2DE2E6] text-black font-bold border-black"
+                        : "bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
+                    }`}
+                  >
+                    <span>SHELF / LIBRARY</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDestination("wishlist")}
+                    className={`pixel-btn text-xs py-2 px-3 flex items-center justify-center gap-2 ${
+                      destination === "wishlist"
+                        ? "bg-[#FF3D81] text-white font-bold border-black"
+                        : "bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
+                    }`}
+                  >
+                    <span>★ WISHLIST</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Rating Control (if status allows) */}
-              {isRatingAllowed(status) && (
-                <div>
-                  <RatingControl value={rating} onChange={setRating} />
+              {/* If Shelf Destination: Pick Status and Rating */}
+              {destination === "shelf" ? (
+                <>
+                  {/* Status Picker */}
+                  <div>
+                    <label className="block font-pixel text-xs text-[#2DE2E6] uppercase tracking-wider mb-2">
+                      CHOOSE STATUS
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {ALLOWED_STATUSES_BY_TYPE[selectedType].map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setStatus(st)}
+                          className={`pixel-btn text-xs py-1.5 px-3 uppercase ${
+                            status === st
+                              ? st === "watched"
+                                ? "bg-[#2DE2E6] text-black font-bold"
+                                : st === "completed"
+                                ? "bg-[#A6FF00] text-black font-bold"
+                                : "bg-[#FFB000] text-black font-bold"
+                              : "bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
+                          }`}
+                        >
+                          {st}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rating Control */}
+                  <div>
+                    <RatingControl value={rating} onChange={setRating} />
+                  </div>
+                </>
+              ) : (
+                /* Wishlist Destination: Info Box */
+                <div className="p-3 bg-[#2D1630] border-2 border-[#FF3D81] space-y-1.5 pixel-shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="font-pixel text-xs text-[#FF3D81] uppercase tracking-wider">
+                      ★ ADDING TO {selectedType.toUpperCase()} WISHLIST
+                    </span>
+                  </div>
+                  <p className="font-vt323 text-base text-[#F4E9D0]/80">
+                    This item will be saved in your Wishlist. You can move it to your shelf and assign an arcade rating once you watch or complete it!
+                  </p>
                 </div>
               )}
 
@@ -420,9 +467,17 @@ export function AddModal({
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="pixel-btn-hero text-xs py-2 px-5 disabled:opacity-50"
+                  className={`text-xs py-2 px-5 disabled:opacity-50 font-pixel uppercase tracking-wider border-2 border-black pixel-shadow ${
+                    destination === "wishlist"
+                      ? "bg-[#FF3D81] text-white hover:bg-[#ff5b94]"
+                      : "pixel-btn-hero"
+                  }`}
                 >
-                  {isSaving ? "SAVING..." : "SAVE TO SHELF"}
+                  {isSaving
+                    ? "SAVING..."
+                    : destination === "wishlist"
+                    ? "SAVE TO WISHLIST"
+                    : "SAVE TO SHELF"}
                 </button>
               </div>
             </form>

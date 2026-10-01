@@ -12,6 +12,7 @@ import {
   PixelCrossIcon,
   PixelTrashIcon,
   PixelCheckIcon,
+  PixelStarIcon,
   FilmIcon,
   TvIcon,
   GamepadIcon,
@@ -23,7 +24,11 @@ interface DetailModalProps {
   onClose: () => void;
   onUpdate: (
     id: string,
-    updates: { status?: ItemStatus; rating?: number | null }
+    updates: {
+      status?: ItemStatus | null;
+      isWishlist?: boolean;
+      rating?: number | null;
+    }
   ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onTriggerLevelUp: () => void;
@@ -37,7 +42,8 @@ export function DetailModal({
   onDelete,
   onTriggerLevelUp,
 }: DetailModalProps) {
-  const [currentStatus, setCurrentStatus] = useState<ItemStatus>("wishlist");
+  const [currentIsWishlist, setCurrentIsWishlist] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<ItemStatus | null>(null);
   const [currentRating, setCurrentRating] = useState<number | null>(null);
   const [isEditingRating, setIsEditingRating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,14 +53,25 @@ export function DetailModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [promptPromptRate, setPromptRate] = useState(false);
 
+  // "Move to shelf" flow for wishlist items
+  const [showMoveToShelf, setShowMoveToShelf] = useState(false);
+  const [moveToShelfStatus, setMoveToShelfStatus] = useState<ItemStatus>("watched");
+  const [moveToShelfRating, setMoveToShelfRating] = useState<number | null>(null);
+
   useEffect(() => {
     if (item) {
+      setCurrentIsWishlist(item.isWishlist);
       setCurrentStatus(item.status);
       setCurrentRating(item.rating);
       setIsEditingRating(false);
       setShowWishlistConfirm(false);
       setShowDeleteConfirm(false);
       setPromptRate(false);
+      setShowMoveToShelf(false);
+      setMoveToShelfStatus(
+        item.type === "game" ? "completed" : "watched"
+      );
+      setMoveToShelfRating(null);
     }
   }, [item]);
 
@@ -62,21 +79,9 @@ export function DetailModal({
 
   const allowedStatuses = ALLOWED_STATUSES_BY_TYPE[item.type];
 
+  // --- Library item: Status change ---
   const handleStatusSelect = async (newStatus: ItemStatus) => {
     if (newStatus === currentStatus) return;
-
-    // Moving to wishlist clears rating - ask for confirmation if rating exists
-    if (newStatus === "wishlist" && currentRating !== null) {
-      setShowWishlistConfirm(true);
-      return;
-    }
-
-    // Moving from wishlist to watched/completed/played: prompt to rate
-    if (currentStatus === "wishlist" && isRatingAllowed(newStatus)) {
-      setCurrentStatus(newStatus);
-      setPromptRate(true);
-      return;
-    }
 
     // Direct status update
     setIsSaving(true);
@@ -96,14 +101,25 @@ export function DetailModal({
     }
   };
 
+  // --- Library item: Move back to wishlist (clears rating) ---
+  const handleMoveToWishlist = () => {
+    if (currentRating !== null) {
+      setShowWishlistConfirm(true);
+    } else {
+      confirmMoveToWishlist();
+    }
+  };
+
   const confirmMoveToWishlist = async () => {
     setIsSaving(true);
     try {
       await onUpdate(item.id, {
-        status: "wishlist",
+        isWishlist: true,
+        status: null,
         rating: null,
       });
-      setCurrentStatus("wishlist");
+      setCurrentIsWishlist(true);
+      setCurrentStatus(null);
       setCurrentRating(null);
       setShowWishlistConfirm(false);
     } catch (err) {
@@ -113,6 +129,36 @@ export function DetailModal({
     }
   };
 
+  // --- Wishlist item: Move to shelf ---
+  const handleConfirmMoveToShelf = async () => {
+    setIsSaving(true);
+    try {
+      await onUpdate(item.id, {
+        isWishlist: false,
+        status: moveToShelfStatus,
+        rating: moveToShelfRating,
+      });
+      setCurrentIsWishlist(false);
+      setCurrentStatus(moveToShelfStatus);
+      setCurrentRating(moveToShelfRating);
+      setShowMoveToShelf(false);
+
+      // Check if rating >= 9.0 on watched/completed -> Level Up!
+      if (
+        moveToShelfRating !== null &&
+        moveToShelfRating >= 9.0 &&
+        (moveToShelfStatus === "watched" || moveToShelfStatus === "completed")
+      ) {
+        onTriggerLevelUp();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // --- Library item: Rating save ---
   const handleSaveRating = async (newRating: number | null) => {
     setIsSaving(true);
     try {
@@ -131,20 +177,6 @@ export function DetailModal({
       ) {
         onTriggerLevelUp();
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSkipPromptRate = async () => {
-    setIsSaving(true);
-    try {
-      await onUpdate(item.id, {
-        status: currentStatus,
-      });
-      setPromptRate(false);
     } catch (err) {
       console.error(err);
     } finally {
@@ -244,7 +276,11 @@ export function DetailModal({
 
               {/* Status and Rating Badges */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <StatusBadge status={currentStatus} size="md" />
+                <StatusBadge
+                  status={currentStatus}
+                  isWishlist={currentIsWishlist}
+                  size="md"
+                />
                 {currentRating !== null && (
                   <RatingBadge rating={currentRating} size="md" />
                 )}
@@ -273,13 +309,148 @@ export function DetailModal({
             </div>
           </div>
 
-          {/* Prompt to Rate when just moved from wishlist */}
-          {promptPromptRate && (
+          {/* === WISHLIST ITEM: Move to Shelf flow === */}
+          {currentIsWishlist && !showMoveToShelf && !showDeleteConfirm && (
+            <div className="space-y-3 pt-2 border-t-2 border-[#2D234A]">
+              <div className="p-3 bg-[#2D1630] border-2 border-[#FF3D81] pixel-shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <PixelStarIcon size={12} className="text-[#FF3D81]" />
+                  <span className="font-pixel text-xs text-[#FF3D81] uppercase tracking-wider">
+                    IN YOUR {item.type.toUpperCase()} WISHLIST
+                  </span>
+                </div>
+                <p className="font-vt323 text-base text-[#F4E9D0]/70">
+                  This title is on your wishlist. Mark it as done to move it to your shelf!
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMoveToShelf(true)}
+                disabled={isSaving}
+                className="pixel-btn text-xs py-2 px-4 bg-[#A6FF00] text-black font-bold border-black w-full flex items-center justify-center gap-2"
+              >
+                <PixelCheckIcon size={12} />
+                MARK AS DONE → MOVE TO SHELF
+              </button>
+            </div>
+          )}
+
+          {/* Move to Shelf Configuration (from wishlist) */}
+          {currentIsWishlist && showMoveToShelf && (
+            <div className="p-4 bg-[#231E3D] border-3 border-[#A6FF00] pixel-shadow space-y-4 animate-coin-pop">
+              <div className="flex items-center gap-2">
+                <PixelCheckIcon size={14} className="text-[#A6FF00]" />
+                <h4 className="font-pixel text-xs text-[#A6FF00] uppercase">
+                  MOVE TO SHELF — PICK STATUS & RATE
+                </h4>
+              </div>
+
+              {/* Status Picker */}
+              <div>
+                <label className="block font-pixel text-[10px] text-[#F4E9D0]/70 uppercase mb-1.5">
+                  STATUS:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {allowedStatuses.map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setMoveToShelfStatus(st)}
+                      className={`pixel-btn text-xs py-1.5 px-3 uppercase ${
+                        moveToShelfStatus === st
+                          ? st === "watched"
+                            ? "bg-[#2DE2E6] text-black font-bold"
+                            : st === "completed"
+                            ? "bg-[#A6FF00] text-black font-bold"
+                            : "bg-[#FFB000] text-black font-bold"
+                          : "bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rating */}
+              <RatingControl
+                value={moveToShelfRating}
+                onChange={(val) => setMoveToShelfRating(val)}
+              />
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowMoveToShelf(false)}
+                  className="pixel-btn text-[10px] bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmMoveToShelf}
+                  disabled={isSaving}
+                  className="pixel-btn text-[10px] bg-[#A6FF00] text-black font-bold border-black"
+                >
+                  {isSaving ? "SAVING..." : "CONFIRM MOVE TO SHELF"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* === LIBRARY ITEM: Status Change Strip === */}
+          {!currentIsWishlist &&
+            !promptPromptRate &&
+            !showWishlistConfirm &&
+            !showDeleteConfirm && (
+              <div className="space-y-2 pt-2 border-t-2 border-[#2D234A]">
+                <label className="block font-pixel text-xs text-[#2DE2E6] uppercase tracking-wider">
+                  CHANGE STATUS:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {allowedStatuses.map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => handleStatusSelect(st)}
+                      disabled={isSaving}
+                      className={`pixel-btn text-xs py-1.5 px-3 uppercase ${
+                        currentStatus === st
+                          ? st === "watched"
+                            ? "bg-[#2DE2E6] text-black font-bold"
+                            : st === "completed"
+                            ? "bg-[#A6FF00] text-black font-bold"
+                            : st === "played"
+                            ? "bg-[#FFB000] text-black font-bold"
+                            : "bg-[#FF3D81] text-white font-bold"
+                          : "bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+
+                  {/* Move to Wishlist Button */}
+                  <button
+                    type="button"
+                    onClick={handleMoveToWishlist}
+                    disabled={isSaving}
+                    className="pixel-btn text-xs py-1.5 px-3 uppercase bg-[#2D1630] text-[#FF3D81] border-[#FF3D81]/60 hover:bg-[#3D1E42] flex items-center gap-1"
+                  >
+                    <PixelStarIcon size={10} />
+                    → WISHLIST
+                  </button>
+                </div>
+              </div>
+            )}
+
+          {/* Prompt to Rate (after status change for library items) */}
+          {!currentIsWishlist && promptPromptRate && (
             <div className="p-4 bg-[#231E3D] border-3 border-[#A6FF00] pixel-shadow space-y-3 animate-coin-pop">
               <div className="flex items-center gap-2">
                 <PixelCheckIcon size={14} className="text-[#A6FF00]" />
                 <h4 className="font-pixel text-xs text-[#A6FF00] uppercase">
-                  MOVED TO {currentStatus.toUpperCase()}! RATE IT NOW?
+                  MOVED TO {currentStatus?.toUpperCase()}! RATE IT NOW?
                 </h4>
               </div>
               <p className="font-vt323 text-base text-[#F4E9D0]/80">
@@ -292,7 +463,17 @@ export function DetailModal({
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={handleSkipPromptRate}
+                  onClick={async () => {
+                    setIsSaving(true);
+                    try {
+                      await onUpdate(item.id, { status: currentStatus });
+                      setPromptRate(false);
+                    } catch (err) {
+                      console.error(err);
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
                   className="pixel-btn text-[10px] bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
                 >
                   SKIP FOR NOW
@@ -308,42 +489,12 @@ export function DetailModal({
             </div>
           )}
 
-          {/* Status Change Strip */}
-          {!promptPromptRate && !showWishlistConfirm && !showDeleteConfirm && (
-            <div className="space-y-2 pt-2 border-t-2 border-[#2D234A]">
-              <label className="block font-pixel text-xs text-[#2DE2E6] uppercase tracking-wider">
-                CHANGE STATUS:
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {allowedStatuses.map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => handleStatusSelect(st)}
-                    disabled={isSaving}
-                    className={`pixel-btn text-xs py-1.5 px-3 uppercase ${
-                      currentStatus === st
-                        ? st === "watched"
-                          ? "bg-[#2DE2E6] text-black font-bold"
-                          : st === "completed"
-                          ? "bg-[#A6FF00] text-black font-bold"
-                          : st === "played"
-                          ? "bg-[#FFB000] text-black font-bold"
-                          : "bg-[#FF3D81] text-white font-bold"
-                        : "bg-[#2A2345] text-[#F4E9D0] border-[#3B335E]"
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Rating Editor (Allowed only for watched/completed/played) */}
-          {!promptPromptRate &&
+          {/* Rating Editor (Library items only, when status allows rating) */}
+          {!currentIsWishlist &&
+            !promptPromptRate &&
             !showWishlistConfirm &&
             !showDeleteConfirm &&
+            currentStatus &&
             isRatingAllowed(currentStatus) && (
               <div className="pt-2 border-t-2 border-[#2D234A]">
                 {isEditingRating ? (
@@ -420,7 +571,7 @@ export function DetailModal({
                   disabled={isSaving}
                   className="pixel-btn text-xs bg-[#FF3D81] text-white font-bold border-black"
                 >
-                  YES, CLEAR RATING
+                  YES, MOVE TO WISHLIST
                 </button>
               </div>
             </div>

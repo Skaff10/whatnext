@@ -6,7 +6,8 @@ import { Header } from "@/components/Header";
 import { StatsStrip } from "@/components/StatsStrip";
 import {
   FilterBar,
-  TypeFilterOption,
+  ActiveSection,
+  WishlistTypeFilter,
   StatusFilterOption,
   SortOption,
 } from "@/components/FilterBar";
@@ -23,9 +24,11 @@ export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filters & Sorting
-  const [typeFilter, setTypeFilter] = useState<TypeFilterOption>("game");
+  // Section-based Navigation
+  const [activeSection, setActiveSection] = useState<ActiveSection>("game");
   const [statusFilter, setStatusFilter] = useState<StatusFilterOption>("all");
+  const [wishlistTypeFilter, setWishlistTypeFilter] =
+    useState<WishlistTypeFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("recent");
 
@@ -81,22 +84,49 @@ export default function Home() {
     [items]
   );
 
-  // Wishlist items for filter bar badge
-  const wishlistItems = useMemo(
-    () => items.filter((i) => i.status === "wishlist"),
-    [items]
-  );
+  // Computed counts for FilterBar
+  const sectionCounts = useMemo(() => {
+    const libraryItems = items.filter((i) => !i.isWishlist);
+    return {
+      game: libraryItems.filter((i) => i.type === "game").length,
+      movie: libraryItems.filter((i) => i.type === "movie").length,
+      series: libraryItems.filter((i) => i.type === "series").length,
+      wishlist: items.filter((i) => i.isWishlist).length,
+    };
+  }, [items]);
+
+  const wishlistCounts = useMemo(() => {
+    const wishlistItems = items.filter((i) => i.isWishlist);
+    return {
+      all: wishlistItems.length,
+      movie: wishlistItems.filter((i) => i.type === "movie").length,
+      series: wishlistItems.filter((i) => i.type === "series").length,
+      game: wishlistItems.filter((i) => i.type === "game").length,
+    };
+  }, [items]);
 
   // Filtering and Sorting
   const filteredAndSortedItems = useMemo(() => {
     let result = [...items];
 
-    // Filter by type
-    result = result.filter((i) => i.type === typeFilter);
+    if (activeSection === "wishlist") {
+      // Show only wishlist items
+      result = result.filter((i) => i.isWishlist);
 
-    // Filter by status
-    if (statusFilter !== "all") {
-      result = result.filter((i) => i.status === statusFilter);
+      // Sub-filter by type
+      if (wishlistTypeFilter !== "all") {
+        result = result.filter((i) => i.type === wishlistTypeFilter);
+      }
+    } else {
+      // Show library items for this type (non-wishlist)
+      result = result.filter(
+        (i) => !i.isWishlist && i.type === activeSection
+      );
+
+      // Filter by status
+      if (statusFilter !== "all") {
+        result = result.filter((i) => i.status === statusFilter);
+      }
     }
 
     // Filter by title search
@@ -133,7 +163,7 @@ export default function Home() {
     });
 
     return result;
-  }, [items, typeFilter, statusFilter, searchQuery, sortOption]);
+  }, [items, activeSection, statusFilter, wishlistTypeFilter, searchQuery, sortOption]);
 
   // CREATE ITEM (Optimistic with Rollback)
   const handleAddItem = async (itemData: {
@@ -144,7 +174,8 @@ export default function Home() {
     posterUrl: string | null;
     overview: string;
     genres: string[];
-    status: ItemStatus;
+    status: ItemStatus | null;
+    isWishlist: boolean;
     rating: number | null;
   }) => {
     const docId = `${itemData.type}-${itemData.externalId}`;
@@ -179,7 +210,12 @@ export default function Home() {
           prev.map((i) => (i.id === docId ? resData.item : i))
         );
       }
-      addToast(`"${itemData.title}" ADDED TO SHELF!`, "success");
+      addToast(
+        itemData.isWishlist
+          ? `"${itemData.title}" ADDED TO WISHLIST!`
+          : `"${itemData.title}" ADDED TO SHELF!`,
+        "success"
+      );
     } catch (err: any) {
       console.error(err);
       // Rollback
@@ -192,7 +228,11 @@ export default function Home() {
   // UPDATE ITEM (Optimistic with Rollback)
   const handleUpdateItem = async (
     id: string,
-    updates: { status?: ItemStatus; rating?: number | null }
+    updates: {
+      status?: ItemStatus | null;
+      isWishlist?: boolean;
+      rating?: number | null;
+    }
   ) => {
     const previousItems = [...items];
     const now = new Date().toISOString();
@@ -276,6 +316,17 @@ export default function Home() {
     }
   };
 
+  // Handle section change (reset filters when switching)
+  const handleSectionChange = (section: ActiveSection) => {
+    setActiveSection(section);
+    setSearchQuery("");
+    setStatusFilter("all");
+    setWishlistTypeFilter("all");
+    // Reset sort to recent when switching to wishlist (rating sort N/A)
+    if (section === "wishlist" && (sortOption === "rating_desc" || sortOption === "rating_asc")) {
+      setSortOption("recent");
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -285,19 +336,24 @@ export default function Home() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         {/* Arcade Stats Strip */}
-        <StatsStrip items={items} />
+        <StatsStrip
+          items={items}
+        />
 
         {/* Filter & Controls Bar */}
         <FilterBar
-          typeFilter={typeFilter}
-          onTypeFilterChange={setTypeFilter}
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
+          wishlistTypeFilter={wishlistTypeFilter}
+          onWishlistTypeFilterChange={setWishlistTypeFilter}
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           sortOption={sortOption}
           onSortOptionChange={setSortOption}
-          wishlistCount={wishlistItems.length}
+          wishlistCounts={wishlistCounts}
+          sectionCounts={sectionCounts}
         />
 
         {/* Content Body */}
@@ -326,6 +382,7 @@ export default function Home() {
         onClose={() => setIsAddOpen(false)}
         onAdd={handleAddItem}
         existingIds={existingIds}
+        defaultSection={activeSection}
       />
 
       <DetailModal

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllItems, getItemById, createItem } from "@/lib/storage";
-import { createItemSchema, Item, roundToOneDecimal } from "@/lib/types";
+import { createItemSchema, Item, ItemStatus, roundToOneDecimal } from "@/lib/types";
 
 export async function GET() {
   try {
@@ -46,8 +46,14 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
+    const effectiveIsWishlist = Boolean(
+      data.isWishlist || data.status === "wishlist"
+    );
+    const finalStatus = effectiveIsWishlist ? null : (data.status as ItemStatus);
     const finalRating =
-      data.rating !== null && data.rating !== undefined
+      !effectiveIsWishlist &&
+      data.rating !== null &&
+      data.rating !== undefined
         ? roundToOneDecimal(data.rating)
         : null;
 
@@ -60,7 +66,8 @@ export async function POST(request: NextRequest) {
       posterUrl: data.posterUrl || null,
       overview: data.overview,
       genres: data.genres,
-      status: data.status,
+      status: finalStatus,
+      isWishlist: effectiveIsWishlist,
       rating: finalRating,
       addedAt: now,
       updatedAt: now,

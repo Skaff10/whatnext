@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getItemById, updateItem, deleteItem } from "@/lib/storage";
 import {
   updateItemSchema,
+  ItemStatus,
   isValidStatusForType,
   roundToOneDecimal,
   ALLOWED_STATUSES_BY_TYPE,
@@ -35,43 +36,68 @@ export async function PATCH(
     }
 
     const updates = parseResult.data;
-    const newStatus = updates.status ?? currentItem.status;
+    const isMovingToWishlist =
+      updates.isWishlist === true || updates.status === "wishlist";
+    const isMovingToLibrary =
+      updates.isWishlist === false ||
+      (currentItem.isWishlist &&
+        updates.status &&
+        updates.status !== "wishlist");
 
-    // Validate status matches item type
-    if (updates.status && !isValidStatusForType(currentItem.type, newStatus)) {
-      return NextResponse.json(
-        {
-          error: `Status "${newStatus}" is not allowed for ${currentItem.type}. Allowed: ${ALLOWED_STATUSES_BY_TYPE[currentItem.type].join(", ")}`,
-        },
-        { status: 400 }
-      );
-    }
+    let finalIsWishlist = currentItem.isWishlist;
+    let finalStatus = currentItem.status;
+    let finalRating = currentItem.rating;
 
-    let newRating: number | null;
+    if (isMovingToWishlist) {
+      finalIsWishlist = true;
+      finalStatus = null;
+      finalRating = null;
+    } else if (isMovingToLibrary) {
+      finalIsWishlist = false;
+      const targetStatus = (updates.status && updates.status !== "wishlist")
+        ? (updates.status as ItemStatus)
+        : (currentItem.type === "game" ? "completed" : "watched");
 
-    if (newStatus === "wishlist") {
-      // Wishlist item can NEVER have a rating. Moving to wishlist clears rating.
-      if (updates.rating !== null && updates.rating !== undefined) {
+      if (!isValidStatusForType(currentItem.type, targetStatus)) {
         return NextResponse.json(
-          { error: "Wishlist items cannot have a rating." },
+          {
+            error: `Status "${targetStatus}" is not allowed for ${currentItem.type}. Allowed: ${ALLOWED_STATUSES_BY_TYPE[currentItem.type].join(", ")}`,
+          },
           { status: 400 }
         );
       }
-      newRating = null;
+      finalStatus = targetStatus;
+      finalRating =
+        updates.rating !== undefined && updates.rating !== null
+          ? roundToOneDecimal(updates.rating)
+          : null;
     } else {
-      // Status is watched, completed, or played
-      if (updates.rating !== undefined) {
-        newRating =
+      // Retain current library status / update existing library item
+      if (updates.status && updates.status !== "wishlist") {
+        if (!isValidStatusForType(currentItem.type, updates.status as ItemStatus)) {
+          return NextResponse.json(
+            {
+              error: `Status "${updates.status}" is not allowed for ${currentItem.type}. Allowed: ${ALLOWED_STATUSES_BY_TYPE[currentItem.type].join(", ")}`,
+            },
+            { status: 400 }
+          );
+        }
+        finalStatus = updates.status as ItemStatus;
+      }
+
+      if (finalIsWishlist) {
+        finalRating = null;
+      } else if (updates.rating !== undefined) {
+        finalRating =
           updates.rating !== null ? roundToOneDecimal(updates.rating) : null;
-      } else {
-        newRating = currentItem.rating;
       }
     }
 
     const updatedAt = new Date().toISOString();
     const updated = await updateItem(id, {
-      status: newStatus,
-      rating: newRating,
+      status: finalStatus,
+      isWishlist: finalIsWishlist,
+      rating: finalRating,
       updatedAt,
     });
 

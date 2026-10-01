@@ -96,7 +96,11 @@ export function Card({ item, onClick, isHighlighted }: CardProps) {
 
         {/* Status Sticker overlay (Top Left) */}
         <div className="absolute top-2 left-2 z-10">
-          <StatusBadge status={item.status} size="sm" />
+          <StatusBadge
+            status={item.status}
+            isWishlist={item.isWishlist}
+            size="sm"
+          />
         </div>
       </div>
 

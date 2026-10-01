@@ -155,7 +155,7 @@ body {
   font-size: 0.875rem;
   letter-spacing: 0.06em;
   padding: 0.75rem 1.4rem;
-  box-shadow: 5px 5px 0 var(--cyan), 7px 7px 0 #000;
+  
   transition: transform 0.05s steps(2, start), box-shadow 0.05s steps(2, start);
 }
 

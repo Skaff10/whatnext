@@ -123,7 +123,11 @@ export function SlotMachinePicker({
                       </span>
                     </p>
                     <div className="mt-1">
-                      <StatusBadge status={pickedItem.status} size="sm" />
+                      <StatusBadge
+                        status={pickedItem.status}
+                        isWishlist={pickedItem.isWishlist}
+                        size="sm"
+                      />
                     </div>
                   </div>
                 </div>

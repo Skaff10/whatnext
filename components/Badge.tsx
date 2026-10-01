@@ -3,12 +3,26 @@ import { ItemStatus } from "@/lib/types";
 import { PixelStarIcon, PixelCheckIcon } from "./PixelIcons";
 
 interface StatusBadgeProps {
-  status: ItemStatus;
+  status?: ItemStatus | string | null;
+  isWishlist?: boolean;
   size?: "sm" | "md";
 }
 
-export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
+export function StatusBadge({ status, isWishlist, size = "md" }: StatusBadgeProps) {
   const isSm = size === "sm";
+
+  if (isWishlist || status === "wishlist") {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 font-pixel uppercase font-bold tracking-wider border-2 border-black bg-[#FF3D81] text-white pixel-shadow-sm ${
+          isSm ? "text-[9px] px-1.5 py-0.5" : "text-[11px] px-2.5 py-1"
+        }`}
+      >
+        <PixelStarIcon size={isSm ? 10 : 12} />
+        WISHLIST
+      </span>
+    );
+  }
 
   switch (status) {
     case "watched":
@@ -18,7 +32,6 @@ export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
             isSm ? "text-[9px] px-1.5 py-0.5" : "text-[11px] px-2.5 py-1"
           }`}
         >
-          
           WATCHED
         </span>
       );
@@ -29,7 +42,6 @@ export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
             isSm ? "text-[9px] px-1 py-0.5" : "text-[11px] px-2.5 py-1"
           }`}
         >
-         
           COMPLETED
         </span>
       );
@@ -43,17 +55,8 @@ export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
           PLAYED
         </span>
       );
-    case "wishlist":
-      return (
-        <span
-          className={`inline-flex items-center gap-1 font-pixel uppercase font-bold tracking-wider border-2 border-black bg-[#FF3D81] text-white pixel-shadow-sm ${
-            isSm ? "text-[9px] px-1.5 py-0.5" : "text-[11px] px-2.5 py-1"
-          }`}
-        >
-         
-          WISHLIST
-        </span>
-      );
+    default:
+      return null;
   }
 }
 
